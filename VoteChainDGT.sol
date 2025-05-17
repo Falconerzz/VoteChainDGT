@@ -57,6 +57,9 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
     mapping(string => bool) private studentIdsUsed;
     mapping(string => bool) private candidateStudentIdsUsed;
 
+    // เพิ่มอาร์เรย์เก็บ address ผู้ลงทะเบียน เพื่อล้างข้อมูลใน setVotingPeriod
+    address[] private registeredVoterAddresses;
+
     uint256 public votingStartTime;
     uint256 public votingEndTime;
 
@@ -85,23 +88,35 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         _;
     }
 
-    // ลบแอดมิน (ฟังก์ชันเสริมถ้าต้องการ)
-    function removeAdmin(address adminToRemove) external onlyAdmin {
-        for (uint i = 0; i < adminAddresses.length; i++) {
-            if (adminAddresses[i] == adminToRemove) {
-                adminAddresses[i] = adminAddresses[adminAddresses.length - 1];
-                adminAddresses.pop();
-                totalAdmins--;
-                break;
-            }
-        }
-    }
-
     function setVotingPeriod(uint256 startTimestamp, uint256 endTimestamp) external onlyAdmin {
         require(startTimestamp < endTimestamp, "Start must be before end");
         votingStartTime = startTimestamp;
         votingEndTime = endTimestamp;
         emit VotingPeriodSet(startTimestamp, endTimestamp);
+
+        // รีเซ็ตคะแนนโหวตของผู้สมัครทุกคน
+        for (uint8 i = 1; i <= totalCandidates; i++) {
+            if (candidates[i].candidateId != 0) {
+                candidates[i].totalVotes = 0;
+            }
+        }
+
+        // ล้างข้อมูลผู้ลงทะเบียน
+        for (uint i = 0; i < registeredVoterAddresses.length; i++) {
+            address voterAddr = registeredVoterAddresses[i];
+            if(voters[voterAddr].isRegistered) {
+                // ลบ studentIdsUsed ของผู้ลงทะเบียนคนนี้ด้วย
+                studentIdsUsed[voters[voterAddr].studentId] = false;
+
+                delete voters[voterAddr];
+            }
+        }
+        delete registeredVoterAddresses;
+
+        // รีเซ็ตเคาน์เตอร์
+        totalRegisteredVoters = 0;
+        totalVotesCast = 0;
+        totalRegisteredVotersWhoVoted = 0;
     }
 
     function addCandidate(
@@ -203,6 +218,9 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
 
         studentIdsUsed[studentId] = true;
 
+        // เก็บ address ผู้ลงทะเบียนไว้เพื่อใช้ล้างข้อมูล
+        registeredVoterAddresses.push(msg.sender);
+
         emit VoterRegistered(msg.sender, studentId);
     }
 
@@ -298,17 +316,28 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         return voteList;
     }
 
-    function getWinner() external view returns (uint8 partyNumber, string memory partyName, string memory candidatePolicy, uint256 votes) {
+    // แก้ไขเพิ่ม isTie ในผลลัพธ์
+    function getWinner() external view returns (
+        uint8 partyNumber,
+        string memory partyName,
+        string memory candidatePolicy,
+        uint256 votes,
+        bool isTie
+    ) {
         require(block.timestamp > votingEndTime, "Election not ended yet");
 
         uint256 maxVotes = 0;
         uint8 winnerId = 0;
+        bool tie = false;
 
         for (uint8 i = 1; i <= totalCandidates; ++i) {
             uint256 vc = candidates[i].totalVotes;
             if (vc > maxVotes) {
                 maxVotes = vc;
                 winnerId = i;
+                tie = false;
+            } else if (vc == maxVotes && vc != 0) {
+                tie = true;
             }
         }
 
@@ -318,6 +347,7 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         partyName = candidates[winnerId].candidatePartyName;
         candidatePolicy = candidates[winnerId].candidatePolicy;
         votes = candidates[winnerId].totalVotes;
+        isTie = tie;
     }
 
     function getAdmins() external view returns (address[] memory) {
@@ -358,3 +388,14 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         return false;
     }
 }
+
+//อ้างอิง
+//โค้ดระบบโหวตเพิ่มผู้สมัครเลือกตั้ง
+//https://github.com/andresudi/Voting-Smart-Contract
+//https://gist.github.com/maheshmurthy/3da385a42678c3e36a8328cbe47cae5b
+//https://github.com/ChaoticQubit/Solidity-Examples-in-Remix-IDE/blob/master/Ballot%20V1.sol
+
+//บทความ + โค้ด
+//https://medium.com/coinmonks/building-a-simple-voting-application-with-solidity-a99ff43cfa14
+//https://medium.com/%40jannden/create-a-presidential-election-smart-contract-in-solidity-ec8145330c17
+//https://dev.to/joshthecodingaddict/building-a-decentralized-voting-system-with-smart-contracts-2k8?utm_source=chatgpt.com
