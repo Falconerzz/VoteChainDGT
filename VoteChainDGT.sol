@@ -6,39 +6,39 @@ import "./VoteChainDGT_StudentIdValidator.sol";
 
 contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
     // Events
-    event CandidateAdded(uint8 candidateId, string partyName);
-    event CandidateRemoved(uint8 candidatePartyNumber, string partyName);
-    event VoterRegistered(address voterAccount, string studentId);
-    event VoteCast(address voterAccount, uint8 candidateId);
-    event VotingPeriodSet(uint256 startTimestamp, uint256 endTimestamp);
+    event CandidateAdded(uint8 candidateId, string partyName); 
+    event CandidateRemoved(uint8 candidateId, string partyName); 
+    event VoterRegistered(address voterAccount, string studentId); 
+    event VoteCast(address voterAccount, uint8 candidatePartyNumber); 
+    event VotingPeriodSet(uint256 startTimestamp, uint256 endTimestamp); 
 
     // Structs
     struct Candidate {
-        uint8 candidateId;
+        uint8 candidateId; 
         uint8 candidatePartyNumber;
-        string candidatePartyName;
-        string candidatePolicy;
-
-        string candidateTitle;
+        string candidatePartyName; 
+        string candidatePolicy; 
+        string candidateTitle; 
         string candidateFirstName;
-        string candidateLastName;
-        string candidateNickname;
+        string candidateLastName; 
+        string candidateNickname; 
         uint8 candidateAge;
-        string candidateBranch;
-        string candidateStudentId;
-        uint256 totalVotes;
+        string candidateBranch; 
+        string candidateStudentId; 
+        uint256 totalVotes; 
         uint256 timeAdded;
+        bool exists; // Flag สำหรับเช็คว่าผู้สมัครยังอยู่ (active) หรือถูกลบแล้ว
     }
 
     struct Voter {
-        bool isRegistered;
-        bool hasVoted;
-        bool hasVotingToken;
-        string studentId;
-        string voterTitle;
-        string voterFirstName;
-        string voterLastName;
-        string voterBranch;
+        bool isRegistered; 
+        bool hasVoted; 
+        bool hasVotingToken; 
+        string studentId; 
+        string voterTitle; 
+        string voterFirstName; 
+        string voterLastName; 
+        string voterBranch; 
     }
 
     struct PartyVoteResult {
@@ -46,38 +46,43 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         uint256 voteCount;
     }
 
-    uint8 public totalCandidates = 0;
-    uint32 public totalRegisteredVoters = 0;
-    uint32 public totalVotesCast = 0;
-    uint32 public totalRegisteredVotersWhoVoted = 0;
+    // ตัวแปรเก็บสถานะผู้สมัคร
+    uint8 maxCandidateId = 0; // หมายเลขผู้สมัครสูงสุดที่เคยมี
+    uint8 totalCandidates = 0; // จำนวนผู้สมัครที่ยัง active อยู่จริง
 
+    // ตัวแปรสถิติการเลือกตั้ง
+    uint32 totalRegisteredVoters = 0; 
+    uint32 totalVotesCast = 0;
+    uint32 totalRegisteredVotersWhoVoted = 0; 
+
+    // Mapping เก็บข้อมูลผู้สมัครโดยใช้ candidateId เป็น key
     mapping(uint8 => Candidate) private candidates;
+    // Mapping เก็บข้อมูลผู้เลือกตั้ง
     mapping(address => Voter) private voters;
+    // ตรวจสอบว่าชื่อพรรคถูกใช้ไปแล้วหรือยัง
     mapping(string => bool) private partyNameUsed;
+    // ตรวจสอบว่ารหัสนักศึกษาถูกใช้ไปแล้วหรือยัง สำหรับผู้ลงทะเบียนเลือกตั้ง
     mapping(string => bool) private studentIdsUsed;
+    // ตรวจสอบว่ารหัสนักศึกษาผู้สมัครถูกใช้ไปแล้วหรือยัง
     mapping(string => bool) private candidateStudentIdsUsed;
 
-    // เพิ่มอาร์เรย์เก็บ address ผู้ลงทะเบียน เพื่อล้างข้อมูลใน setVotingPeriod
     address[] private registeredVoterAddresses;
 
-    uint256 public votingStartTime;
-    uint256 public votingEndTime;
+    uint256 public votingStartTime; 
+    uint256 public votingEndTime; 
 
-    // Admin addresses manually managed
-    address[] public adminAddresses;
+    address[] adminAddresses; 
+    uint16 totalAdmins = 0; 
 
-    // ตัวแปรเก็บแอดมินจำนวน (ถ้าต้องการ)
-    uint16 public totalAdmins = 0;
-
-    // เพิ่มแอดมินคนแรกตอน deploy
+    // constructor เพิ่มแอดมินคนแรก
     constructor() {
         adminAddresses.push(msg.sender);
-        totalAdmins = 1;
+        totalAdmins = 1; 
     }
 
-    // ตรวจสอบว่าเป็นแอดมิน (manual check)
+    // modifier ตรวจสอบสิทธิ์แอดมิน
     modifier onlyAdmin() {
-        bool adminFound = false; // เปลี่ยนชื่อตัวแปรไม่ให้ซ้ำกับฟังก์ชัน
+        bool adminFound = false; 
         for(uint i = 0; i < adminAddresses.length; i++) {
             if(adminAddresses[i] == msg.sender) {
                 adminFound = true;
@@ -88,37 +93,37 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         _;
     }
 
+    // ฟังก์ชันตั้งช่วงเวลาเลือกตั้ง และรีเซ็ตข้อมูลที่เกี่ยวข้อง
     function setVotingPeriod(uint256 startTimestamp, uint256 endTimestamp) external onlyAdmin {
         require(startTimestamp < endTimestamp, "Start must be before end");
-        votingStartTime = startTimestamp;
+        votingStartTime = startTimestamp; 
         votingEndTime = endTimestamp;
-        emit VotingPeriodSet(startTimestamp, endTimestamp);
+        emit VotingPeriodSet(startTimestamp, endTimestamp); 
 
-        // รีเซ็ตคะแนนโหวตของผู้สมัครทุกคน
-        for (uint8 i = 1; i <= totalCandidates; i++) {
-            if (candidates[i].candidateId != 0) {
+        // รีเซ็ตคะแนนโหวตของผู้สมัครที่ยัง active
+        for (uint8 i = 1; i <= maxCandidateId; i++) {
+            if (candidates[i].exists) {
                 candidates[i].totalVotes = 0;
             }
         }
 
-        // ล้างข้อมูลผู้ลงทะเบียน
+        // ลบข้อมูลผู้ลงทะเบียนเลือกตั้งทั้งหมด
         for (uint i = 0; i < registeredVoterAddresses.length; i++) {
             address voterAddr = registeredVoterAddresses[i];
             if(voters[voterAddr].isRegistered) {
-                // ลบ studentIdsUsed ของผู้ลงทะเบียนคนนี้ด้วย
                 studentIdsUsed[voters[voterAddr].studentId] = false;
-
                 delete voters[voterAddr];
             }
         }
         delete registeredVoterAddresses;
 
-        // รีเซ็ตเคาน์เตอร์
+        // รีเซ็ตสถิติ
         totalRegisteredVoters = 0;
         totalVotesCast = 0;
         totalRegisteredVotersWhoVoted = 0;
     }
 
+    // ฟังก์ชันเพิ่มผู้สมัครใหม่
     function addCandidate(
         uint8 candidateId,
         uint8 candidatePartyNumber,
@@ -132,14 +137,20 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         string calldata candidateBranch,
         string calldata candidateStudentId
     ) external onlyAdmin {
-        require(block.timestamp < votingStartTime || votingStartTime == 0, "Cannot add candidates during voting period");
+        // เงื่อนไขสำคัญ: เพิ่มผู้สมัครได้ก็ต่อเมื่อไม่อยู่ในช่วงเวลาการเลือกตั้ง
+        require(block.timestamp < votingStartTime || votingStartTime == 0 || block.timestamp > votingEndTime, "Cannot add candidates during voting period");
+        
         require(isValidStudentId(candidateStudentId), "Invalid candidate student ID format");
-        require(!partyNameUsed[candidatePartyName], "Party name already used");
         require(candidateId > 0 && candidateId <= MAX_CANDIDATE_ID, "ID must be between 1 and MAX_CANDIDATE_ID");
         require(candidatePartyNumber > 0 && candidatePartyNumber <= MAX_PARTY_NUMBER, "Party number must be between 1 and MAX_PARTY_NUMBER");
-        require(candidates[candidateId].candidateId == 0, "ID already taken");
-        require(candidates[candidatePartyNumber].candidatePartyNumber == 0, "Party number already taken");
+
+        // ตรวจสอบว่า candidateId ยังไม่มีผู้สมัครที่ active อยู่
+        require(!candidates[candidateId].exists, "Candidate ID already taken");
+        // ตรวจสอบชื่อพรรคยังไม่ถูกใช้
+        require(!partyNameUsed[candidatePartyName], "Party name already used");
+        // ตรวจสอบรหัสนักศึกษาผู้สมัครยังไม่ถูกใช้
         require(!candidateStudentIdsUsed[candidateStudentId], "Candidate Student ID already used");
+
         require(
             keccak256(abi.encodePacked(candidateBranch)) == keccak256(abi.encodePacked(BRANCH_DT)) ||
             keccak256(abi.encodePacked(candidateBranch)) == keccak256(abi.encodePacked(BRANCH_DC)),
@@ -159,36 +170,52 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
             candidateBranch: candidateBranch,
             candidateStudentId: candidateStudentId,
             totalVotes: 0,
-            timeAdded: block.timestamp
+            timeAdded: block.timestamp,
+            exists: true
         });
 
         candidates[candidateId] = newCandidate;
         partyNameUsed[candidatePartyName] = true;
         candidateStudentIdsUsed[candidateStudentId] = true;
 
-        if (candidateId > totalCandidates) {
-            totalCandidates = candidateId;
+        if (candidateId > maxCandidateId) {
+            maxCandidateId = candidateId;
         }
+
+        totalCandidates++;
 
         emit CandidateAdded(candidateId, candidatePartyName);
     }
 
-    function removeCandidateByPartyNumber(uint8 partyNumber) external onlyAdmin {
-        Candidate storage candidate = candidates[partyNumber];
-        require(candidate.candidateId != 0, "Candidate not found");
+    // ฟังก์ชันลบผู้สมัครโดยใช้ candidateId
+    function removeCandidateByCandidateId(uint8 candidateId) external onlyAdmin {
+        Candidate storage candidate = candidates[candidateId];
+        require(candidate.exists, "Candidate not found");
 
         partyNameUsed[candidate.candidatePartyName] = false;
         candidateStudentIdsUsed[candidate.candidateStudentId] = false;
 
-        delete candidates[partyNumber];
+        // ล้างข้อมูลผู้สมัคร
+        candidate.exists = false;
+        candidate.totalVotes = 0;
+        candidate.candidatePartyNumber = 0;
+        candidate.candidatePartyName = "";
+        candidate.candidatePolicy = "";
+        candidate.candidateTitle = "";
+        candidate.candidateFirstName = "";
+        candidate.candidateLastName = "";
+        candidate.candidateNickname = "";
+        candidate.candidateAge = 0;
+        candidate.candidateBranch = "";
+        candidate.candidateStudentId = "";
+        candidate.timeAdded = 0;
 
-        if (candidate.candidateId == totalCandidates) {
-            totalCandidates--;
-        }
+        totalCandidates--;
 
-        emit CandidateRemoved(partyNumber, candidate.candidatePartyName);
+        emit CandidateRemoved(candidateId, candidate.candidatePartyName);
     }
 
+    // ฟังก์ชันลงทะเบียนผู้เลือกตั้ง
     function registerVoter(
         string calldata studentId,
         string calldata voterTitle,
@@ -214,16 +241,15 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
             voterLastName: voterLastName,
             voterBranch: voterBranch
         });
+
         totalRegisteredVoters++;
-
         studentIdsUsed[studentId] = true;
-
-        // เก็บ address ผู้ลงทะเบียนไว้เพื่อใช้ล้างข้อมูล
         registeredVoterAddresses.push(msg.sender);
 
         emit VoterRegistered(msg.sender, studentId);
     }
 
+    // ฟังก์ชันโหวตโดยระบุเลขพรรค (candidatePartyNumber)
     function vote(
         string calldata studentId,
         uint8 candidatePartyNumber
@@ -236,8 +262,17 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         require(!voterData.hasVoted, "Already voted");
         require(voterData.hasVotingToken, "No voting token");
 
-        Candidate storage candidateData = candidates[candidatePartyNumber];
-        require(candidateData.candidateId != 0, "Bad candidate");
+        // หา candidateId โดยวนหา candidate ที่เลขพรรคตรงกับ candidatePartyNumber
+        uint8 candidateId = 0;
+        for (uint8 i = 1; i <= maxCandidateId; i++) {
+            if (candidates[i].exists && candidates[i].candidatePartyNumber == candidatePartyNumber) {
+                candidateId = i;
+                break;
+            }
+        }
+        require(candidateId != 0, "Bad candidate party number");
+
+        Candidate storage candidateData = candidates[candidateId];
 
         voterData.hasVoted = true;
         voterData.hasVotingToken = false;
@@ -248,24 +283,35 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         emit VoteCast(msg.sender, candidatePartyNumber);
     }
 
+    // ดึงข้อมูลผู้สมัครทั้งหมด
     function getAllCandidates() external view returns (uint8, Candidate[] memory) {
-        Candidate[] memory candidateList = new Candidate[](totalCandidates);
+        Candidate[] memory tempList = new Candidate[](totalCandidates);
         uint8 index = 0;
 
-        for (uint8 i = 1; i <= totalCandidates; i++) {
-            if (candidates[i].candidateId != 0) {
-                candidateList[index] = candidates[i];
+        for (uint8 i = 1; i <= maxCandidateId; i++) {
+            if (candidates[i].exists) {
+                tempList[index] = candidates[i];
                 index++;
             }
         }
-        return (totalCandidates, candidateList);
+
+        Candidate[] memory candidateList = new Candidate[](index);
+        for (uint8 j = 0; j < index; j++) {
+            candidateList[j] = tempList[j];
+        }
+
+        return (index, candidateList);
     }
 
+    // ฟังก์ชันค้นหาผู้สมัครจากเลขพรรค (candidatePartyNumber)
     function getCandidateByPartyNumber(uint8 partyNumber)
         external
         view
         returns (
             uint8 candidateId,
+            uint8 candidatePartyNumber,
+            string memory candidatePartyName,
+            string memory candidatePolicy,
             string memory candidateTitle,
             string memory candidateFirstName,
             string memory candidateLastName,
@@ -273,38 +319,39 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
             uint8 candidateAge,
             string memory candidateBranch,
             string memory candidateStudentId,
-            uint8 candidatePartyNumber,
-            string memory candidatePartyName,
-            string memory candidatePolicy,
             uint256 timeAdded
         )
     {
-        Candidate storage candidate = candidates[partyNumber];
-        require(candidate.candidateId != 0, "Candidate not found");
-
-        return (
-            candidate.candidateId,
-            candidate.candidateTitle,
-            candidate.candidateFirstName,
-            candidate.candidateLastName,
-            candidate.candidateNickname,
-            candidate.candidateAge,
-            candidate.candidateBranch,
-            candidate.candidateStudentId,
-            candidate.candidatePartyNumber,
-            candidate.candidatePartyName,
-            candidate.candidatePolicy,
-            candidate.timeAdded
-        );
+        for (uint8 i = 1; i <= maxCandidateId; i++) {
+            if (candidates[i].exists && candidates[i].candidatePartyNumber == partyNumber) {
+                Candidate storage c = candidates[i];
+                return (
+                    c.candidateId,
+                    c.candidatePartyNumber,
+                    c.candidatePartyName,
+                    c.candidatePolicy,
+                    c.candidateTitle,
+                    c.candidateFirstName,
+                    c.candidateLastName,
+                    c.candidateNickname,
+                    c.candidateAge,
+                    c.candidateBranch,
+                    c.candidateStudentId,
+                    c.timeAdded
+                );
+            }
+        }
+        revert("Candidate with given party number not found");
     }
 
+    // ดึงผลโหวตทั้งหมดของพรรค
     function getAllPartyVotes() external view returns (PartyVoteResult[] memory partyVoteResults) {
         require(block.timestamp > votingEndTime, "Election not ended yet");
         PartyVoteResult[] memory voteList = new PartyVoteResult[](totalCandidates);
         uint8 index = 0;
 
-        for (uint8 i = 1; i <= totalCandidates; i++) {
-            if (candidates[i].candidateId != 0) {
+        for (uint8 i = 1; i <= maxCandidateId; i++) {
+            if (candidates[i].exists) {
                 voteList[index] = PartyVoteResult({
                     partyNumber: candidates[i].candidatePartyNumber,
                     voteCount: candidates[i].totalVotes
@@ -316,7 +363,7 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         return voteList;
     }
 
-    // แก้ไขเพิ่ม isTie ในผลลัพธ์
+    // หาผู้ชนะ (ผู้สมัครที่คะแนนมากที่สุด)
     function getWinner() external view returns (
         uint8 partyNumber,
         string memory partyName,
@@ -330,7 +377,8 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         uint8 winnerId = 0;
         bool tie = false;
 
-        for (uint8 i = 1; i <= totalCandidates; ++i) {
+        for (uint8 i = 1; i <= maxCandidateId; ++i) {
+            if (!candidates[i].exists) continue;
             uint256 vc = candidates[i].totalVotes;
             if (vc > maxVotes) {
                 maxVotes = vc;
@@ -350,10 +398,12 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         isTie = tie;
     }
 
-    function getAdmins() external view returns (address[] memory) {
+    // ดึงรายชื่อแอดมินทั้งหมด
+    function getAdmins() external view onlyAdmin returns (address[] memory) {
         return adminAddresses;
     }
 
+    // ดึงข้อมูลสรุปการเลือกตั้ง
     function getElectionSummary()
         external
         view
@@ -372,13 +422,14 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         registeredButNotVotedCount = totalRegisteredVoters - totalRegisteredVotersWhoVoted;
     }
 
-    function getStudentIdByAccount(address account) external view returns (string memory) {
+    // ดึงรหัสนักศึกษาจากบัญชีผู้เลือกตั้ง
+    function getStudentIdByAccount(address account) external view onlyAdmin returns (string memory) {
         Voter storage voterData = voters[account];
         require(voterData.isRegistered, "Account not registered as voter");
         return voterData.studentId;
     }
 
-    // helper internal function to check admin
+    // ฟังก์ชันภายในตรวจสอบแอดมิน
     function isAdmin(address user) internal view returns (bool) {
         for(uint i = 0; i < adminAddresses.length; i++) {
             if(adminAddresses[i] == user) {
