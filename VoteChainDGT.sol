@@ -27,7 +27,7 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         string candidateStudentId; 
         uint256 totalVotes; 
         uint256 timeAdded;
-        bool exists; // Flag สำหรับเช็คว่าผู้สมัครยังอยู่ (active) หรือถูกลบแล้ว
+        bool exists;
     }
 
     struct Voter {
@@ -47,8 +47,8 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
     }
 
     // ตัวแปรเก็บสถานะผู้สมัคร
-    uint8 maxCandidateId = 0; // หมายเลขผู้สมัครสูงสุดที่เคยมี
-    uint8 totalCandidates = 0; // จำนวนผู้สมัครที่ยัง active อยู่จริง
+    uint8 maxCandidateId = 0;
+    uint8 totalCandidates = 0;
 
     // ตัวแปรสถิติการเลือกตั้ง
     uint32 totalRegisteredVoters = 0; 
@@ -112,7 +112,7 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
             address voterAddr = registeredVoterAddresses[i];
             if(voters[voterAddr].isRegistered) {
                 studentIdsUsed[voters[voterAddr].studentId] = false;
-                delete voters[voterAddr];
+                ฆdelete voters[voterAddr];
             }
         }
         delete registeredVoterAddresses;
@@ -398,7 +398,6 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
         isTie = tie;
     }
 
-    // ดึงรายชื่อแอดมินทั้งหมด
     function getAdmins() external view onlyAdmin returns (address[] memory) {
         return adminAddresses;
     }
