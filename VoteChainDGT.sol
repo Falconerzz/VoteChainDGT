@@ -449,4 +449,4 @@ contract VoteChainDGT is VoteChainDGT_Config, VoteChainDGT_StudentIdValidator {
 //บทความ + โค้ด
 //https://medium.com/coinmonks/building-a-simple-voting-application-with-solidity-a99ff43cfa14
 //https://medium.com/%40jannden/create-a-presidential-election-smart-contract-in-solidity-ec8145330c17
-//https://dev.to/joshthecodingaddict/building-a-decentralized-voting-system-with-smart-contracts-2k8?utm_source=chatgpt.com
+//https://dev.to/joshthecodingaddict/building-a-decentralized-voting-system-with-smart-contracts-2k8?utm_source
